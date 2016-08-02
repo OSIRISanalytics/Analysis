@@ -1,6 +1,7 @@
 library(dplyr)
 library(RSQLite)
 library(tidyr)
+library(sqldf)
 
 Mode <- function(x) {
   ux <- unique(x)
@@ -53,4 +54,41 @@ for (i in seq_along(betfair_games[,1])) {
 }
 
 # Adding in the Osiris ID to the data sets
+# Only keep games where we know we have a definite match
+betfair_short = betfair %>%
+  left_join(betfair_games, by = "market_id") %>% select(-Team_1,-Team_2,-Team_3) %>%
+  filter(!is.na(osiris_id)) 
+
+betfair_short = betfair_short %>%
+  mutate(team = rep(c("Team_1","Team_2","Team_3"), nrow(betfair_short) / 3))%>%
+  gather(market, value, available_to_back_price,available_to_back_market,available_to_lay_price,available_to_lay_market) %>%
+  spread(team, runner) %>%
+  unite(surrogate,team, market) %>%
+  spread(surrogate, value)
+
+pinnacle_short = pinnacle %>%
+  left_join(pin_games, by = "event_id", copy=FALSE) %>%
+  filter(!is.na(osiris_id))
+
+
+# Now we join
+
+joined = sqldf::sqldf(
+"
+SELECT
+  a.log_time,
+  b.league_name,
+  a.gom
+FROM
+  betfair_short a
+  INNER JOIN pinnacle_short b ON (
+    a.osiris_id = b.osiris_id AND
+    a.log_time = b.log_time)
+                      
+                      
+                      ")
+
+
+
+
 
